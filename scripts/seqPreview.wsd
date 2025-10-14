@@ -1,0 +1,38 @@
+@startuml
+title Диаграмма последовательности: Telegram-бот с интеграцией Yandex LLM
+
+actor Пользователь as User
+participant "Telegram\n(клиент)" as Telegram
+participant "Telebot\n(бот-контроллер)" as Telebot
+participant "check_message\n(валидация)" as CheckMsg
+participant "call_yandex_llm\n(интеграция с LLM)" as YandexLLMCall
+participant "fourcid_validator\n(анализ 4C/ID)" as FourCID
+participant "Yandex Cloud\nLLM API" as YandexAPI
+
+== Клиентский уровень ==
+User -> Telegram : Отправка сообщения боту
+Telegram -> Telebot : Пересылка сообщения (webhook / polling)
+
+== Серверный уровень ==
+Telebot -> CheckMsg : Проверка корректности сообщения
+CheckMsg -> YandexLLMCall : Отправка текста для оценки
+YandexLLMCall -> YandexAPI : POST /validate_message
+YandexAPI --> YandexLLMCall : JSON с результатом проверки
+YandexLLMCall --> CheckMsg : Результат валидации
+
+alt Сообщение корректно
+    Telebot -> FourCID : Анализ по фреймворку 4C/ID
+    FourCID -> YandexLLMCall : Отправка текста для анализа
+    YandexLLMCall -> YandexAPI : POST /analyze_4cid
+    YandexAPI --> YandexLLMCall : JSON с результатом анализа
+    YandexLLMCall --> FourCID : Текст анализа
+    FourCID --> Telebot : Итоговый отчёт
+else Ошибка валидации
+    CheckMsg --> Telebot : Ответ о некорректном сообщении
+end
+
+== Ответ пользователю ==
+Telebot -> Telegram : Отправка итогового сообщения
+Telegram -> User : Вывод результата в чате
+
+@enduml
